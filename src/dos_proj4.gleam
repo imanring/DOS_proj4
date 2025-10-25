@@ -1,4 +1,5 @@
 import gleam/erlang/process
+import gleam/float
 import gleam/int
 import gleam/io
 import gleam/list
@@ -311,7 +312,34 @@ pub fn start_reddit_engine() -> process.Subject(RedditMsg) {
   new_actor.data
 }
 
+fn get_zipf(i: Float, u: Float) {
+  case u <. 0.0 {
+    True -> i -. 1.0
+    False -> {
+      get_zipf(i +. 1.0, u -. 1.0 /. i)
+    }
+  }
+}
+
+fn get_zipf_list(size: Int, hn: Float, result: List(Int)) -> List(Int) {
+  case size <= 0 {
+    True -> result
+    False -> {
+      let u = float.random() *. hn
+      get_zipf_list(size - 1, hn, [float.round(get_zipf(1.0, u)), ..result])
+    }
+  }
+}
+
+fn gen_zipf(n: Int, size: Int) -> List(Int) {
+  let denom =
+    list.fold(list.range(1, n), 0.0, fn(ac, k) { ac +. 1.0 /. int.to_float(k) })
+  get_zipf_list(size, denom, [])
+}
+
 pub fn main() {
+  let x = gen_zipf(10, 50)
+  echo x
   let reddit_engine = start_reddit_engine()
   let user1 = start_user_actor(1)
   process.send(reddit_engine, NewSubReddit)

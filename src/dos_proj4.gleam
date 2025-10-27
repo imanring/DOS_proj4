@@ -7,7 +7,7 @@ import gleam/otp/actor
 
 pub type UserMsg {
   MakePost(Int, Int, String)
-  ReceiveFeed(sub_reddits: List(SubReddit))
+  ReceiveFeed(sub_reddits: List(List(Post)))
 }
 
 // Placeholder for User Actor (AI generated)
@@ -60,7 +60,7 @@ pub type RedditMsg {
   NewSubReddit
   CastVote(subreddit_id: Int, post_id: Int, upvote: Bool)
   // True for upvote, False for downvote
-  GetFeed(subscriptions: List(Int), reply_to: process.Subject(UserMsg))
+  GetFeed(subscriptions: List(Int), k: Int, reply_to: process.Subject(UserMsg))
 }
 
 pub type RedditEngineState {
@@ -147,30 +147,6 @@ pub fn insert_post(xs: List(Post), new_item: Post) -> List(Post) {
         True -> [new_item, ..xs]
         False -> [head, ..insert_post(tail, new_item)]
       }
-    }
-  }
-}
-
-// print subreddit feed (for testing)
-fn print_subreddit_feed(posts: List(Post), indent: String) -> Nil {
-  case posts {
-    [] -> Nil
-    [post, ..rest] -> {
-      io.println(
-        indent
-        <> "Post ID: "
-        <> int.to_string(post.id)
-        <> ", Text: "
-        <> post.text
-        <> ", Upvotes: "
-        <> int.to_string(post.up_votes)
-        <> ", Downvotes: "
-        <> int.to_string(post.down_votes)
-        <> ", Karma: "
-        <> int.to_string(post.karma),
-      )
-      let _ = print_subreddit_feed(post.children, indent <> "  ")
-      print_subreddit_feed(rest, indent)
     }
   }
 }
@@ -283,25 +259,16 @@ pub fn engine_handler(
         })
       actor.continue(RedditEngineState(..state, subreddits: updated_subreddits))
     }
-    GetFeed(subscriptions, reply_to) -> {
+    GetFeed(subscriptions, k, reply_to) -> {
+      // get the top k posts from each subscription
       // Handle feed retrieval
-      // For simplicity, just print the first subreddits' posts
-      case list.first(state.subreddits) {
-        Ok(first) -> {
-          io.println("Feed for subreddit: " <> first.name)
-          print_subreddit_feed(
-            list.sort(first.posts, fn(p1, p2) {
-              int.compare(p2.karma, p1.karma)
-            }),
-            "",
-          )
-        }
-        Error(_) -> io.println("No subreddits available")
-      }
       let subreddits =
-        list.filter(state.subreddits, fn(sr) {
-          list.contains(subscriptions, sr.id)
-        })
+        list.map(
+          list.filter(state.subreddits, fn(sr) {
+            list.contains(subscriptions, sr.id)
+          }),
+          fn(x) { list.take(x.posts, k) },
+        )
       // send subreddits back to requester (not implemented)
       process.send(reply_to, ReceiveFeed(subreddits))
       actor.continue(state)
@@ -352,6 +319,6 @@ pub fn main() {
   process.send(reddit_engine, NewPost(1, -1, "Hello, Reddit!", user1))
   process.send(reddit_engine, CastVote(1, 2, True))
   process.send(reddit_engine, NewPost(1, 2, "What a great post!", user1))
-  process.send(reddit_engine, GetFeed([], user1))
+  process.send(reddit_engine, GetFeed([1], 2, user1))
   process.sleep(1000)
 }

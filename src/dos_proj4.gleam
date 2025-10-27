@@ -8,7 +8,11 @@ import gleam/option.{type Option, None, Some}
 import gleam/otp/actor
 
 pub type DMThread {
-  DMThread(partner: process.Subject(UserMsg), messages: String)
+  DMThread(
+    receiver: process.Subject(UserMsg),
+    sender: process.Subject(UserMsg),
+    messages: String,
+  )
 }
 
 // User
@@ -47,38 +51,55 @@ fn user_messages(state: UserState, msg: UserMsg) {
       process.send(state.engine, SendFeed(state.subscriptions))
       actor.continue(state)
     }
+
     SendDM(receiver, dm) -> {
       case state.self {
         Some(sender) -> {
+          let new_dm_thread = DMThread(receiver, sender, dm)
+          let new_dms = list.append(state.dms, [new_dm_thread])
+
           io.println(
             "User "
             <> int.to_string(state.id)
             <> " is sending a message to a user.",
           )
           process.send(receiver, ReceiveDM(sender, dm))
+          actor.continue(UserState(..state, dms: new_dms))
         }
-        _ ->
+        _ -> {
           io.println(
-            "Error: Wrong initialization for user "
+            "Fatal: Wrong initialization for user "
             <> int.to_string(state.id)
             <> ".",
           )
+          actor.continue(state)
+        }
       }
-
-      actor.continue(state)
     }
 
     ReceiveDM(sender, dm) -> {
-      let new_dm_thread = DMThread(sender, dm)
-      let new_dms = list.append(state.dms, [new_dm_thread])
-      io.println(
-        "User "
-        <> int.to_string(state.id)
-        <> " receives message '"
-        <> dm
-        <> "'.",
-      )
-      actor.continue(UserState(..state, dms: new_dms))
+      case state.self {
+        Some(receiver) -> {
+          let new_dm_thread = DMThread(receiver, sender, dm)
+          let new_dms = list.append(state.dms, [new_dm_thread])
+          io.println(
+            "User "
+            <> int.to_string(state.id)
+            <> " receives message '"
+            <> dm
+            <> "'.",
+          )
+          actor.continue(UserState(..state, dms: new_dms))
+        }
+        _ -> {
+          io.println(
+            "Fatal: Wrong initialization for user "
+            <> int.to_string(state.id)
+            <> ".",
+          )
+          actor.continue(state)
+        }
+      }
     }
 
     MakePost(subreddit, parent, text) -> {

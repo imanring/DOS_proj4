@@ -6,6 +6,7 @@ import gleam/io
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/otp/actor
+import gleam/string
 
 pub type DMThread {
   DMThread(
@@ -31,12 +32,27 @@ pub type UserMsg {
   ShutDown
   Initialize(self: process.Subject(UserMsg))
   GetFeed
+  ReceiveFeed(posts: List(Post))
   SendDM(receiver: process.Subject(UserMsg), dm: String)
   ReceiveDM(sender: process.Subject(UserMsg), dm: String)
   MakePost(subreddit: Int, parent: Int, text: String)
   Vote(subreddit: Int, post_id: Int, up_vote: Bool)
   UpdateKarma(delta: Float)
   Subscribe(subreddit: Int)
+}
+
+fn print_feed(posts: List(Post)) {
+  case posts {
+    [] -> {
+      io.println("")
+    }
+    [post, ..rest] -> {
+      io.println(
+        "Post id: " <> int.to_string(post.id) <> " text: " <> post.text,
+      )
+      print_feed(rest)
+    }
+  }
 }
 
 fn user_messages(state: UserState, msg: UserMsg) {
@@ -49,6 +65,20 @@ fn user_messages(state: UserState, msg: UserMsg) {
 
     GetFeed -> {
       process.send(state.engine, SendFeed(state.subscriptions))
+      actor.continue(state)
+    }
+
+    ReceiveFeed(posts) -> {
+      let sbs = list.map(state.subscriptions, int.to_string)
+      let joined = string.join(sbs, ", ")
+      io.println(
+        "User "
+        <> int.to_string(state.id)
+        <> " receiving feed from the engine. Its subcriptions are Subreddit: "
+        <> joined,
+      )
+
+      print_feed(posts)
       actor.continue(state)
     }
 
@@ -246,7 +276,7 @@ pub fn main() {
       let assert Ok(receiver) = list.last(users)
       process.send(user, SendDM(receiver, "Hi there!"))
       process.send(user, Subscribe(0))
-
+      process.send(user, ReceiveFeed([]))
       process.sleep(1000)
     }
     _ -> io.println("Please provide arguments: num_users")

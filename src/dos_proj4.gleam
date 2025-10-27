@@ -7,6 +7,7 @@ import gleam/otp/actor
 
 pub type UserMsg {
   MakePost(Int, Int, String)
+  ReceiveFeed(sub_reddits: List(SubReddit))
 }
 
 // Placeholder for User Actor (AI generated)
@@ -25,6 +26,9 @@ fn start_user_actor(user_id: Int) -> process.Subject(UserMsg) {
             <> ": "
             <> text,
           )
+          actor.continue(state)
+        }
+        ReceiveFeed(_sub_reddits) -> {
           actor.continue(state)
         }
       }
@@ -56,7 +60,7 @@ pub type RedditMsg {
   NewSubReddit
   CastVote(subreddit_id: Int, post_id: Int, upvote: Bool)
   // True for upvote, False for downvote
-  GetFeed(subscriptions: List(Int))
+  GetFeed(subscriptions: List(Int), reply_to: process.Subject(UserMsg))
 }
 
 pub type RedditEngineState {
@@ -279,7 +283,7 @@ pub fn engine_handler(
         })
       actor.continue(RedditEngineState(..state, subreddits: updated_subreddits))
     }
-    GetFeed(subscriptions) -> {
+    GetFeed(subscriptions, reply_to) -> {
       // Handle feed retrieval
       // For simplicity, just print the first subreddits' posts
       case list.first(state.subreddits) {
@@ -294,11 +298,12 @@ pub fn engine_handler(
         }
         Error(_) -> io.println("No subreddits available")
       }
-      let _subreddits =
+      let subreddits =
         list.filter(state.subreddits, fn(sr) {
           list.contains(subscriptions, sr.id)
         })
       // send subreddits back to requester (not implemented)
+      process.send(reply_to, ReceiveFeed(subreddits))
       actor.continue(state)
     }
   }
@@ -347,6 +352,6 @@ pub fn main() {
   process.send(reddit_engine, NewPost(1, -1, "Hello, Reddit!", user1))
   process.send(reddit_engine, CastVote(1, 2, True))
   process.send(reddit_engine, NewPost(1, 2, "What a great post!", user1))
-  process.send(reddit_engine, GetFeed([]))
+  process.send(reddit_engine, GetFeed([], user1))
   process.sleep(1000)
 }

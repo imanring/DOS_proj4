@@ -89,15 +89,11 @@ pub fn main() {
       process.send(user, Subscribe(0))
       process.send(engine, NewSubReddit)
       process.send(receiver, MakePost(0, -1, "First Post!", receiver))
+      process.send(user, MakePost(0, 0, "Nice post.", user))
       process.send(user, RequestFeed(user))
       process.sleep(1000)
     }
     _ -> io.println("Please provide arguments: num_users")
   }
-
-  // let user1 = start_user(1, engine)
-  // let user2 = start_user(2, engine)
-  // process.send(user2, ReceiveDM(user1, "A test message"))
-  // process.send(user1, UpdateKarma(10.0))
   process.sleep(1000)
 }

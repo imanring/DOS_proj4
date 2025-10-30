@@ -32,16 +32,36 @@ pub type UserState {
   )
 }
 
-fn print_feed(posts: List(Post)) {
+// print subreddit feed (for testing)
+fn print_feed(posts: List(Post), indent: String) -> Nil {
   case posts {
-    [] -> {
-      io.println("")
-    }
+    [] -> Nil
     [post, ..rest] -> {
       io.println(
-        "Post id: " <> int.to_string(post.id) <> " text: " <> post.text,
+        indent
+        <> "Post ID: "
+        <> int.to_string(post.id)
+        <> ", Text: "
+        <> post.text
+        <> ", Upvotes: "
+        <> int.to_string(post.up_votes)
+        <> ", Downvotes: "
+        <> int.to_string(post.down_votes)
+        <> ", Karma: "
+        <> int.to_string(post.karma),
       )
-      print_feed(rest)
+      let _ = print_feed(post.children, indent <> "  ")
+      print_feed(rest, indent)
+    }
+  }
+}
+
+fn print_subreddits(subreddits: List(List(Post))) {
+  case subreddits {
+    [] -> Nil
+    [head, ..tail] -> {
+      print_feed(head, "")
+      print_subreddits(tail)
     }
   }
 }
@@ -68,8 +88,7 @@ fn user_messages(state: UserState, msg: UserMsg) {
         <> " receiving feed from the engine. Its subcriptions are Subreddit: "
         <> joined,
       )
-      let assert Ok(p) = list.first(posts)
-      print_feed(p)
+      print_subreddits(posts)
       actor.continue(state)
     }
 

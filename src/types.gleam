@@ -1,8 +1,21 @@
 import gleam/erlang/process
 
 pub type UserMsg {
-  MakePost(Int, Int, String)
-  ReceiveFeed(sub_reddits: List(List(Post)))
+  ShutDown
+  Initialize(self: process.Subject(UserMsg))
+  RequestFeed(reply_to: process.Subject(UserMsg))
+  ReceiveFeed(posts: List(List(Post)))
+  SendDM(receiver: process.Subject(UserMsg), dm: String)
+  ReceiveDM(sender: process.Subject(UserMsg), dm: String)
+  MakePost(
+    subreddit: Int,
+    parent: Int,
+    text: String,
+    poster: process.Subject(UserMsg),
+  )
+  Vote(subreddit: Int, post_id: Int, up_vote: Bool)
+  UpdateKarma(delta: Float)
+  Subscribe(subreddit: Int)
 }
 
 // Reddit Engine

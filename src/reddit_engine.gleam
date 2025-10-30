@@ -143,7 +143,7 @@ pub fn engine_handler(
             id: state.max_subreddit_id + 1,
             name: "subreddit_" <> int.to_string(state.max_subreddit_id + 1),
             posts: [],
-            max_post_id: 0,
+            max_post_id: -1,
           ),
           ..state.subreddits
         ],
@@ -205,7 +205,7 @@ pub fn engine_handler(
 
 pub fn start_reddit_engine() -> process.Subject(RedditMsg) {
   let builder =
-    actor.new(RedditEngineState(subreddits: [], max_subreddit_id: 0))
+    actor.new(RedditEngineState(subreddits: [], max_subreddit_id: -1))
     |> actor.on_message(engine_handler)
   let assert Ok(new_actor) = actor.start(builder)
   new_actor.data

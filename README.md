@@ -7,7 +7,7 @@
 gleam run 3
 ```
 
-```gleam
+```sh
 *** Start Simulation: A simple demo with 3 users. ***
 
 New user(s) registered. Now there are 3 users.

@@ -5,7 +5,7 @@ import gleam/otp/actor
 import types.{
   type Post, type RedditEngineState, type RedditMsg, type SubReddit, CastVote,
   GetFeed, NewPost, NewSubReddit, Post, ReceiveFeed, RedditEngineState,
-  SubReddit,
+  SubReddit
 }
 
 fn update_post_by_id(

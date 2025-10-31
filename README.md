@@ -22,5 +22,5 @@ Post ID: 0, Text: First Post!, Upvotes: 0, Downvotes: 0, Karma: 1
 We can also simulate a large-scale Reddit community. The subreddits are initialized with a number of subscribers based on a Zipf distribution. Each user will take a random action (including subscribe a subReddit, Make a post or comment, vote, send direct messages, and request feed) every 2 seconds.
 
 ```sh
-gleam run 100000
+gleam run 50000
 ```

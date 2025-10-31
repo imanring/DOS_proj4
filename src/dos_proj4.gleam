@@ -224,7 +224,7 @@ pub fn main() {
       io.println("")
       let assert Ok(num_users) = int.parse(num_users)
       // simulation(num_users)
-      process.sleep(5000)
+      process.sleep(50000)
     }
     _ -> io.println("Please provide arguments: num_users")
   }

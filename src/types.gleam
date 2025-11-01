@@ -42,8 +42,13 @@ pub type RedditMsg {
   CastVote(subreddit_id: Int, post_id: Int, upvote: Bool)
   // True for upvote, False for downvote
   GetFeed(subscriptions: List(Int), k: Int, reply_to: process.Subject(UserMsg))
+  GetStats
 }
 
 pub type RedditEngineState {
-  RedditEngineState(subreddits: List(SubReddit), max_subreddit_id: Int)
+  RedditEngineState(
+    subreddits: List(SubReddit),
+    max_subreddit_id: Int,
+    total_msg: Int,
+  )
 }

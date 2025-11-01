@@ -1,11 +1,12 @@
 import gleam/erlang/process
 import gleam/int
+import gleam/io
 import gleam/list
 import gleam/otp/actor
 import types.{
   type Post, type RedditEngineState, type RedditMsg, type SubReddit, CastVote,
-  GetFeed, NewPost, NewSubReddit, Post, ReceiveFeed, RedditEngineState,
-  SubReddit
+  GetFeed, GetStats, NewPost, NewSubReddit, Post, ReceiveFeed, RedditEngineState,
+  SubReddit,
 }
 
 fn update_post_by_id(
@@ -133,7 +134,13 @@ pub fn engine_handler(
             }
           }
         })
-      actor.continue(RedditEngineState(..state, subreddits: updated_subreddit))
+      actor.continue(
+        RedditEngineState(
+          ..state,
+          subreddits: updated_subreddit,
+          total_msg: state.total_msg + 1,
+        ),
+      )
     }
     NewSubReddit -> {
       // Handle new subreddit creation
@@ -148,6 +155,7 @@ pub fn engine_handler(
           ..state.subreddits
         ],
         max_subreddit_id: state.max_subreddit_id + 1,
+        total_msg: state.total_msg + 1,
       ))
     }
     CastVote(subreddit_id, post_id, upvote) -> {
@@ -184,7 +192,13 @@ pub fn engine_handler(
             )
           SubReddit(..sr, posts: updated_posts)
         })
-      actor.continue(RedditEngineState(..state, subreddits: updated_subreddits))
+      actor.continue(
+        RedditEngineState(
+          ..state,
+          subreddits: updated_subreddits,
+          total_msg: state.total_msg + 1,
+        ),
+      )
     }
     GetFeed(subscriptions, k, reply_to) -> {
       // get the top k posts from each subscription
@@ -198,6 +212,10 @@ pub fn engine_handler(
         )
       // send subreddits back to requester (not implemented)
       process.send(reply_to, ReceiveFeed(subreddits))
+      actor.continue(RedditEngineState(..state, total_msg: state.total_msg + 1))
+    }
+    GetStats -> {
+      io.println("Total messages: " <> int.to_string(state.total_msg))
       actor.continue(state)
     }
   }
@@ -205,7 +223,11 @@ pub fn engine_handler(
 
 pub fn start_reddit_engine() -> process.Subject(RedditMsg) {
   let builder =
-    actor.new(RedditEngineState(subreddits: [], max_subreddit_id: -1))
+    actor.new(RedditEngineState(
+      subreddits: [],
+      max_subreddit_id: -1,
+      total_msg: 0,
+    ))
     |> actor.on_message(engine_handler)
   let assert Ok(new_actor) = actor.start(builder)
   new_actor.data

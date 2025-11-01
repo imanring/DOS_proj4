@@ -4,7 +4,6 @@ import gleam/float
 import gleam/int
 import gleam/io
 import gleam/list
-import gleam/option
 import reddit_engine.{start_reddit_engine}
 import reddit_user.{start_user}
 import types.{
@@ -51,43 +50,12 @@ fn register_users(
 //   }
 // }
 
-fn get_zipf(i: Float, u: Float) {
-  case u <. 0.0 {
-    True -> i -. 1.0
-    False -> {
-      get_zipf(i +. 1.0, u -. 1.0 /. i)
-    }
-  }
-}
-
-fn get_zipf_list(size: Int, hn: Float, result: List(Int)) -> List(Int) {
-  case size <= 0 {
-    True -> result
-    False -> {
-      let u = float.random() *. hn
-      get_zipf_list(size - 1, hn, [float.round(get_zipf(1.0, u)), ..result])
-    }
-  }
-}
-
-fn gen_zipf(n: Int, size: Int) -> List(Int) {
-  let denom =
-    list.fold(list.range(1, n), 0.0, fn(ac, k) { ac +. 1.0 /. int.to_float(k) })
-  get_zipf_list(size, denom, [])
-}
-
 fn random_element(users: List(a)) -> a {
   let len = list.length(users)
   let index = int.random(len - 1)
   let remaining = list.drop(users, index)
   let assert Ok(user) = list.first(remaining)
   user
-}
-
-fn initialize_subreddits(engine, users, sr_usrs) {
-  let len = list.length(sr_usrs)
-  register_subreddits(engine, len)
-  subscribe_subreddits(engine, users, sr_usrs, 0)
 }
 
 fn register_subreddits(engine, num: Int) {
@@ -97,28 +65,22 @@ fn register_subreddits(engine, num: Int) {
   }
 }
 
-fn subscribe_subreddits(engine, users, sr_usrs, index) {
-  case sr_usrs {
-    [num, ..rest] -> {
-      user_subscribe_subreddits(users, num, index)
-      subscribe_subreddits(engine, users, rest, index + 1)
-    }
+fn user_subscribe_subreddits(users, k, hn, n, avg_num_subs) {
+  case users {
     [] -> Nil
-  }
-}
-
-fn user_subscribe_subreddits(users, num, sr_id) {
-  case num > 0 {
-    True -> {
-      case users {
-        [user, ..rest] -> {
-          process.send(user, Subscribe(sr_id))
-          user_subscribe_subreddits(rest, num - 1, sr_id)
+    [head, ..tail] -> {
+      case k {
+        0 -> user_subscribe_subreddits(tail, n, hn, n, avg_num_subs)
+        _ -> {
+          let x = float.random()
+          case x <=. avg_num_subs /. { int.to_float(k) *. hn } {
+            True -> process.send(head, Subscribe(k - 1))
+            False -> Nil
+          }
+          user_subscribe_subreddits(users, k - 1, hn, n, avg_num_subs)
         }
-        [] -> io.println("Fatal: Empty user list!")
       }
     }
-    False -> Nil
   }
 }
 
@@ -136,77 +98,155 @@ fn run_demo(num_users: Int) {
   process.send(user, RequestFeed(user))
 }
 
-// Simulating a large-scale Reddit community.
-fn simulation(num_users: Int) {
-  let engine = start_reddit_engine()
-  let users = register_users(num_users, engine, [])
-  let sr_usrs = gen_zipf(1000, 100)
-  initialize_subreddits(engine, users, sr_usrs)
-  // Periodically send messages to all users
-  process.spawn(fn() { loop(users) })
+fn get_zipf(i: Float, u: Float) {
+  case u <. 0.0 {
+    True -> i -. 1.0
+    False -> {
+      get_zipf(i +. 1.0, u -. 1.0 /. i)
+    }
+  }
 }
 
-fn loop(users: List(process.Subject(UserMsg))) -> Nil {
+// Simulating a large-scale Reddit community.
+fn simulation(num_users: Int, n_subreddits: Int) {
+  let engine = start_reddit_engine()
+  let users = register_users(num_users, engine, [])
+  register_subreddits(engine, n_subreddits)
+  // denominator in Zipf distribution.
+  let hn =
+    list.fold(list.range(1, n_subreddits), 0.0, fn(ac, k) {
+      ac +. 1.0 /. int.to_float(k)
+    })
+  user_subscribe_subreddits(users, n_subreddits, hn, n_subreddits, 10.0)
+  // Initialize pairs list with (subreddit_id, max_post_id) for each subreddit.
+  // max_post_id starts at -1 to indicate no posts yet for that subreddit.
+  let pairs = list.map(list.range(0, n_subreddits - 1), fn(i) { #(i, -1) })
+  // Periodically send messages to all users
+  process.spawn(fn() { loop(users, pairs) })
+}
+
+fn loop(users: List(process.Subject(UserMsg)), pairs: List(#(Int, Int))) -> Nil {
   io.println("** Periodically: Users taking random actions.")
-  let pairs = generate_msg(users, [])
-  list.each(pairs, fn(pair) {
-    let #(user, msg) = pair
-    process.send(user, msg)
-  })
+  let pairs = generate_msg(users, pairs)
   // Users take random actions every 2 seconds
-  process.sleep(2000)
+  process.sleep(200)
   io.println("")
-  loop(users)
+  loop(users, pairs)
 }
 
 fn generate_msg(
   users: List(process.Subject(UserMsg)),
-  pairs: List(#(process.Subject(UserMsg), UserMsg)),
-) -> List(#(process.Subject(UserMsg), UserMsg)) {
+  subreddits: List(#(Int, Int)),
+) -> List(#(Int, Int)) {
   case users {
     [user, ..rest] -> {
       let partner = random_element(users)
       let action = int.random(10)
-      let sr_id = int.random(100)
-      // For simplicity, choose a random post_id regardless of existence (if post doesn't exist, it will do nothing) 
-      let post_id = int.random(1000)
-      // 70% Upvote    30% Downvote 
-      let vote = int.random(10) > 2
-      // Random Action:
-      // 10% SendDM  10% Subscribe  10% Make a new post  20% Comment(or do nothing) 10% Vote(or do nothing) 40% Request feed
-      let pairs = case action {
-        0 ->
-          list.append(pairs, [
-            #(user, SendDM(partner, "Hi there.")),
-          ])
-        1 ->
-          list.append(pairs, [
-            #(user, Subscribe(sr_id)),
-          ])
-        2 ->
-          list.append(pairs, [
-            #(user, MakePost(sr_id, -1, "Hello Reddit!", user)),
-          ])
-        3 ->
-          list.append(pairs, [
-            #(user, MakePost(sr_id, post_id, "Nice post!", user)),
-          ])
-        4 ->
-          list.append(pairs, [
-            #(user, MakePost(sr_id, post_id, "I disagree.", user)),
-          ])
-        5 ->
-          list.append(pairs, [
-            #(user, Vote(post_id, sr_id, vote)),
-          ])
-        _ ->
-          list.append(pairs, [
-            #(user, RequestFeed(user)),
-          ])
+      // Choose a random subreddit from the tracked subreddits list
+      case list.length(subreddits) {
+        0 -> {
+          // No subreddits tracked; nothing to do for subreddit-related actions
+          generate_msg(rest, subreddits)
+        }
+        _ -> {
+          // Zipf distribution for which subreddit to interact with
+          let hn =
+            list.fold(list.range(1, list.length(subreddits)), 0.0, fn(ac, k) {
+              ac +. 1.0 /. int.to_float(k)
+            })
+          let sr_id = float.round(get_zipf(1.0, float.random() *. hn)) - 1
+          let assert Ok(max_post_id) = list.key_find(subreddits, sr_id)
+          // Determine a valid parent/post id when needed based on max_post_id
+          // 70% Upvote    30% Downvote 
+          let vote = int.random(10) > 2
+          // Random Action:
+          // 10% SendDM  10% Subscribe  10% Make a new post  20% Comment(or do nothing) 10% Vote(or do nothing) 40% Request feed
+          let subreddits = case action {
+            0 -> {
+              process.send(user, SendDM(partner, "Hi there."))
+              subreddits
+            }
+            // New top-level post: increment tracked max_post_id for this subreddit
+            2 -> {
+              process.send(user, MakePost(sr_id, -1, "Hello Reddit!", user))
+              list.map(subreddits, fn(item) {
+                let #(id, max_id) = item
+                case id == sr_id {
+                  True -> #(id, max_id + 1)
+                  False -> #(id, max_id)
+                }
+              })
+            }
+            // Reply to an existing post (if any). If none exist, treat as a new post.
+            3 -> {
+              io.println("Trying to reply to: " <> int.to_string(max_post_id))
+              case max_post_id {
+                -1 -> {
+                  subreddits
+                }
+                _ -> {
+                  let parent = int.random(max_post_id)
+                  io.println("Making reply: " <> int.to_string(parent))
+                  // A reply creates a new post (child) so increment max_post_id locally
+                  process.send(
+                    user,
+                    MakePost(sr_id, parent, "Nice post!", user),
+                  )
+                  list.map(subreddits, fn(item) {
+                    let #(id, max_id) = item
+                    case id == sr_id {
+                      True -> #(id, max_id + 1)
+                      False -> #(id, max_id)
+                    }
+                  })
+                }
+              }
+            }
+            // Another reply variant
+            4 -> {
+              case max_post_id {
+                -1 -> {
+                  subreddits
+                }
+                _ -> {
+                  let parent = int.random(max_post_id)
+                  process.send(
+                    user,
+                    MakePost(sr_id, parent, "I disagree.", user),
+                  )
+                  list.map(subreddits, fn(item) {
+                    let #(id, max_id) = item
+                    case id == sr_id {
+                      True -> #(id, max_id + 1)
+                      False -> #(id, max_id)
+                    }
+                  })
+                }
+              }
+            }
+            // Vote: only if there are posts in the subreddit
+            5 -> {
+              case max_post_id {
+                -1 -> Nil
+                _ -> {
+                  let voted_post = int.random(max_post_id)
+                  process.send(user, Vote(sr_id, voted_post, vote))
+                }
+              }
+              subreddits
+            }
+            // do nothing (inactivity)
+            9 -> subreddits
+            _ -> {
+              process.send(user, RequestFeed(user))
+              subreddits
+            }
+          }
+          generate_msg(rest, subreddits)
+        }
       }
-      generate_msg(rest, pairs)
     }
-    [] -> pairs
+    [] -> subreddits
   }
 }
 
@@ -223,8 +263,8 @@ pub fn main() {
       io.println("*** Start Simulation: A large-scale Reddit community. ***")
       io.println("")
       let assert Ok(num_users) = int.parse(num_users)
-      // simulation(num_users)
-      process.sleep(50000)
+      simulation(num_users, 100)
+      process.sleep(1000)
     }
     _ -> io.println("Please provide arguments: num_users")
   }

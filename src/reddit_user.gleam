@@ -167,13 +167,13 @@ fn user_messages(state: UserState, msg: UserMsg) {
 
     Subscribe(subreddit) -> {
       let new_subs = list.append(state.subscriptions, [subreddit])
-      io.println(
-        "User "
-        <> int.to_string(state.id)
-        <> " has subscribed subReddit "
-        <> int.to_string(subreddit)
-        <> ".",
-      )
+      //io.println(
+      //  "User "
+      //  <> int.to_string(state.id)
+      //  <> " has subscribed subReddit "
+      //  <> int.to_string(subreddit)
+      //  <> ".",
+      //)
       actor.continue(UserState(..state, subscriptions: new_subs))
     }
   }

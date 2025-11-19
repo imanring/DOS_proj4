@@ -14,7 +14,10 @@ import mist
 import reddit_api
 import reddit_engine
 import reddit_user
-import types.{type Post, type RedditMsg, type UserMsg, GetFeed, ReceiveFeed}
+import types.{
+  type ApiMsg, type Post, type RedditMsg, type UserMsg, GetFeed, GetUsers,
+  ReceiveFeed, Users,
+}
 
 fn parse_int_or_default(s: String, default: Int) -> Int {
   case int.parse(s) {
@@ -137,6 +140,48 @@ fn extract_bool_field(body: String, key: String, default: Bool) -> Bool {
   }
 }
 
+type LookupUserError {
+  NotFound
+  Timeout
+  Unexpected
+}
+
+fn lookup_user(
+  engine: process.Subject(RedditMsg),
+  user_id: Int,
+) -> Result(process.Subject(UserMsg), LookupUserError) {
+  let reply: process.Subject(ApiMsg) = process.new_subject()
+  process.send(engine, GetUsers(reply))
+  case process.receive(reply, 2000) {
+    Ok(Users(users)) -> {
+      case list.find(users, fn(user_tuple) { user_tuple.0 == user_id }) {
+        Ok(#(_, actor)) -> Ok(actor)
+        Error(_) -> Error(NotFound)
+      }
+    }
+    Error(_) -> Error(Timeout)
+  }
+}
+
+fn respond_lookup_error(
+  err: LookupUserError,
+  not_found_msg: String,
+) -> response.Response(mist.ResponseData) {
+  case err {
+    NotFound ->
+      response.new(404)
+      |> response.set_body(mist.Bytes(bytes_tree.from_string(not_found_msg)))
+    Timeout ->
+      response.new(504)
+      |> response.set_body(mist.Bytes(bytes_tree.from_string("Engine timeout")))
+    Unexpected ->
+      response.new(500)
+      |> response.set_body(
+        mist.Bytes(bytes_tree.from_string("Unexpected engine reply")),
+      )
+  }
+}
+
 fn handle_request(
   req: Request(mist.Connection),
   engine: process.Subject(RedditMsg),
@@ -155,13 +200,22 @@ fn handle_request(
               let poster_id = extract_int_field(body_str, "poster", 0)
               let text = extract_string_field(body_str, "text", "")
 
-              let poster = reddit_user.start_user(poster_id, engine)
-              reddit_api.create_post(engine, subreddit, parent, text, poster)
-
-              response.new(202)
-              |> response.set_body(
-                mist.Bytes(bytes_tree.from_string("Accepted")),
-              )
+              case lookup_user(engine, poster_id) {
+                Ok(poster) -> {
+                  reddit_api.create_post(
+                    engine,
+                    subreddit,
+                    parent,
+                    text,
+                    poster,
+                  )
+                  response.new(202)
+                  |> response.set_body(
+                    mist.Bytes(bytes_tree.from_string("Accepted")),
+                  )
+                }
+                Error(err) -> respond_lookup_error(err, "Poster not found")
+              }
             }
             Error(_) ->
               response.new(400)
@@ -249,6 +303,86 @@ fn handle_request(
                   |> response.set_body(
                     mist.Bytes(bytes_tree.from_string("Gateway Timeout")),
                   )
+              }
+            }
+            Error(_) ->
+              response.new(400)
+              |> response.set_body(
+                mist.Bytes(bytes_tree.from_string("Bad request")),
+              )
+          }
+        }
+        Error(_) ->
+          response.new(400)
+          |> response.set_body(
+            mist.Bytes(bytes_tree.from_string("Bad request")),
+          )
+      }
+    }
+
+    ["create_user"] -> {
+      case mist.read_body(req, 1024 * 4) {
+        Ok(r) -> {
+          case bit_array.to_string(r.body) {
+            Ok(body) -> {
+              let user_id = extract_int_field(body, "user_id", 0)
+              case lookup_user(engine, user_id) {
+                Ok(_) ->
+                  response.new(409)
+                  |> response.set_body(
+                    mist.Bytes(bytes_tree.from_string("User already exists")),
+                  )
+                Error(NotFound) -> {
+                  let user = reddit_user.start_user(user_id, engine)
+                  reddit_api.create_user(engine, user_id, user)
+                  response.new(201)
+                  |> response.set_body(
+                    mist.Bytes(bytes_tree.from_string("User Created")),
+                  )
+                }
+                Error(err) ->
+                  respond_lookup_error(err, "Unable to verify users")
+              }
+            }
+            Error(_) ->
+              response.new(400)
+              |> response.set_body(
+                mist.Bytes(bytes_tree.from_string("Bad request")),
+              )
+          }
+        }
+        Error(_) ->
+          response.new(400)
+          |> response.set_body(
+            mist.Bytes(bytes_tree.from_string("Bad request")),
+          )
+      }
+    }
+
+    ["send_dm"] -> {
+      io.println("Sending DM!")
+      case mist.read_body(req, 1024 * 4) {
+        Ok(r) -> {
+          case bit_array.to_string(r.body) {
+            Ok(body) -> {
+              let sender_id = extract_int_field(body, "sender_id", 0)
+              let receiver_id = extract_int_field(body, "receiver_id", 0)
+              let message = extract_string_field(body, "message", "")
+              case lookup_user(engine, sender_id) {
+                Ok(sender) -> {
+                  case lookup_user(engine, receiver_id) {
+                    Ok(receiver) -> {
+                      reddit_api.send_dm(sender, receiver, message)
+                      response.new(200)
+                      |> response.set_body(
+                        mist.Bytes(bytes_tree.from_string("DM Sent")),
+                      )
+                    }
+                    Error(err) ->
+                      respond_lookup_error(err, "Receiver not found")
+                  }
+                }
+                Error(err) -> respond_lookup_error(err, "Sender not found")
               }
             }
             Error(_) ->

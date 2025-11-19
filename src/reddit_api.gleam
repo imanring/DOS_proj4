@@ -1,12 +1,14 @@
 import gleam/erlang/process
 import gleam/list
+
 // Int parsing is intentionally left to the HTTP handler to keep helpers
 // framework-agnostic; handlers can convert strings to ints using their
 // chosen JSON/parser helpers.
-import gleam/string
 import gleam/io
+import gleam/string
 import types.{
-  type RedditMsg, type UserMsg, NewPost, NewSubReddit, CastVote, GetFeed,
+  type RedditMsg, type UserMsg, AddUser, CastVote, GetFeed, NewPost,
+  NewSubReddit, SendDM,
 }
 
 // Lightweight, framework-agnostic API helpers for the Reddit engine.
@@ -30,7 +32,12 @@ pub fn create_subreddit(engine: process.Subject(RedditMsg)) {
 }
 
 // Cast a vote on a post.
-pub fn vote(engine: process.Subject(RedditMsg), subreddit_id: Int, post_id: Int, upvote: Bool) {
+pub fn vote(
+  engine: process.Subject(RedditMsg),
+  subreddit_id: Int,
+  post_id: Int,
+  upvote: Bool,
+) {
   process.send(engine, CastVote(subreddit_id, post_id, upvote))
 }
 
@@ -77,4 +84,22 @@ pub fn example_create_post_cli(
 ) {
   io.println("Creating example post in subreddit 0")
   create_post(engine, 0, -1, "Hello from API CLI", poster)
+}
+
+// Create a new user.
+pub fn create_user(
+  engine: process.Subject(RedditMsg),
+  user_id: Int,
+  user: process.Subject(UserMsg),
+) {
+  process.send(engine, AddUser(user_id, user))
+}
+
+// Send a direct message from one user to another.
+pub fn send_dm(
+  sender: process.Subject(UserMsg),
+  receiver: process.Subject(UserMsg),
+  message: String,
+) {
+  process.send(sender, SendDM(receiver, message))
 }

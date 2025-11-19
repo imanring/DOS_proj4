@@ -18,6 +18,10 @@ pub type UserMsg {
   Subscribe(subreddit: Int)
 }
 
+pub type ApiMsg {
+  Users(List(#(Int, process.Subject(UserMsg))))
+}
+
 // Reddit Engine
 pub type Post {
   Post(
@@ -43,6 +47,8 @@ pub type RedditMsg {
   // True for upvote, False for downvote
   GetFeed(subscriptions: List(Int), k: Int, reply_to: process.Subject(UserMsg))
   GetStats
+  AddUser(Int, process.Subject(UserMsg))
+  GetUsers(reply_to: process.Subject(ApiMsg))
 }
 
 pub type RedditEngineState {
@@ -50,5 +56,6 @@ pub type RedditEngineState {
     subreddits: List(SubReddit),
     max_subreddit_id: Int,
     total_msg: Int,
+    users: List(#(Int, process.Subject(UserMsg))),
   )
 }

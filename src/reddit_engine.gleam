@@ -4,9 +4,9 @@ import gleam/io
 import gleam/list
 import gleam/otp/actor
 import types.{
-  type Post, type RedditEngineState, type RedditMsg, type SubReddit, CastVote,
-  GetFeed, GetStats, NewPost, NewSubReddit, Post, ReceiveFeed, RedditEngineState,
-  SubReddit,
+  type Post, type RedditEngineState, type RedditMsg, type SubReddit, AddUser,
+  CastVote, GetFeed, GetStats, GetUsers, NewPost, NewSubReddit, Post,
+  ReceiveFeed, RedditEngineState, SubReddit, Users,
 }
 
 fn update_post_by_id(
@@ -158,6 +158,7 @@ pub fn engine_handler(
         ],
         max_subreddit_id: state.max_subreddit_id + 1,
         total_msg: state.total_msg + 1,
+        users: state.users,
       ))
     }
     CastVote(subreddit_id, post_id, upvote) -> {
@@ -226,16 +227,33 @@ pub fn engine_handler(
       io.println("Total messages: " <> int.to_string(state.total_msg))
       actor.continue(state)
     }
+    AddUser(user_id, user) -> {
+      io.println("Adding new user")
+      actor.continue(
+        RedditEngineState(
+          ..state,
+          users: [#(user_id, user), ..state.users],
+          total_msg: state.total_msg + 1,
+        ),
+      )
+    }
+    GetUsers(reply_to) -> {
+      process.send(reply_to, Users(state.users))
+      actor.continue(RedditEngineState(..state, total_msg: state.total_msg + 1))
+    }
   }
 }
 
 pub fn start_reddit_engine() -> process.Subject(RedditMsg) {
   let builder =
-    actor.new(RedditEngineState(
-      subreddits: [],
-      max_subreddit_id: -1,
-      total_msg: 0,
-    ))
+    actor.new(
+      RedditEngineState(
+        subreddits: [],
+        max_subreddit_id: -1,
+        total_msg: 0,
+        users: [],
+      ),
+    )
     |> actor.on_message(engine_handler)
   let assert Ok(new_actor) = actor.start(builder)
   new_actor.data

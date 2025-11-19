@@ -85,6 +85,7 @@ pub fn engine_handler(
 ) -> actor.Next(RedditEngineState, RedditMsg) {
   case msg {
     NewPost(subreddit_id, parent_post_id, text, poster) -> {
+      io.println("New post: " <> text)
       // Handle new post or reply
       let #(updated_subreddit, _) =
         update_subreddit_by_id(state.subreddits, subreddit_id, fn(subreddit) {
@@ -143,6 +144,7 @@ pub fn engine_handler(
       )
     }
     NewSubReddit -> {
+      io.println("NewSubReddit: " <> int.to_string(state.max_subreddit_id))
       // Handle new subreddit creation
       actor.continue(RedditEngineState(
         subreddits: [
@@ -163,6 +165,12 @@ pub fn engine_handler(
         True -> 1
         False -> -1
       }
+      io.println(
+        "Casting vote: "
+        <> int.to_string(vote)
+        <> ", post id: "
+        <> int.to_string(post_id),
+      )
       // Handle voting
       let #(updated_subreddits, _) =
         update_subreddit_by_id(state.subreddits, subreddit_id, fn(sr) {

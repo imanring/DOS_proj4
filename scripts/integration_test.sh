@@ -38,7 +38,7 @@ done
 
 # 1) Create subreddit
 echo "1) Create subreddit"
-HTTP_CODE=$(curl -s -o /tmp/test_create_sub.out -w "%{http_code}" -X POST http://127.0.0.1:8080/subreddits)
+HTTP_CODE=$(curl -s -o /tmp/test_create_sub.out -w "%{http_code}" -X POST http://127.0.0.1:8080/create_subreddit)
 cat /tmp/test_create_sub.out
 if [ "$HTTP_CODE" != "201" ]; then
   echo "Create subreddit failed (code $HTTP_CODE)"
@@ -49,7 +49,7 @@ fi
 echo "2) Create post"
 HTTP_CODE=$(curl -s -o /tmp/test_create_post.out -w "%{http_code}" -X POST -H "Content-Type: application/json" \
   -d '{"subreddit":1,"parent":-1,"poster":123,"text":"Integration test post"}' \
-  http://127.0.0.1:8080/posts)
+  http://127.0.0.1:8080/create_post)
 cat /tmp/test_create_post.out
 if [ "$HTTP_CODE" != "202" ]; then
   echo "Create post failed (code $HTTP_CODE)"

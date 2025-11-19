@@ -23,8 +23,8 @@ fetch('http://localhost:8080/feed_sync', {
 ```
 
 Note: the server's endpoints are:
-- `POST /subreddits` -> creates a subreddit (returns 201)
-- `POST /posts` -> create a post, JSON: `{ "subreddit": Int, "parent": Int, "poster": Int, "text": String }` (returns 202)
+- `POST /create_subreddit` -> creates a subreddit (returns 201)
+- `POST /create_post` -> create a post, JSON: `{ "subreddit": Int, "parent": Int, "poster": Int, "text": String }` (returns 202)
 - `POST /vote` -> cast a vote, JSON: `{ "subreddit": Int, "post_id": Int, "up": Bool }` (returns 200)
 - `POST /feed_sync` -> synchronous feed, JSON: `{ "subs_csv": String, "k": Int }` (returns 200 with JSON feed, or 504 on timeout)
 
@@ -33,13 +33,13 @@ Note: the server's endpoints are:
 Create a subreddit:
 
 ```bash
-curl -X POST http://127.0.0.1:8080/subreddits -v
+curl -X POST http://127.0.0.1:8080/create_subreddit -v
 ```
 
 Create a post:
 
 ```bash
-curl -X POST http://127.0.0.1:8080/posts \
+curl -X POST http://127.0.0.1:8080/create_post \
   -H "Content-Type: application/json" \
   -d '{"subreddit":1,"parent":-1,"poster":123,"text":"Hello from curl"}'
 ```

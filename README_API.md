@@ -7,7 +7,7 @@ simple path-segment based arguments to keep the example short.
 Endpoints (examples):
 
 - Create a post (top-level or reply):
-  POST /posts/<subreddit>/<parent>/<poster>/<text>
+  POST /create_post/<subreddit>/<parent>/<poster>/<text>
   - `subreddit`: Int id of subreddit (-1 for none)
   - `parent`: Int id of parent post (-1 for top-level)
   - `poster`: Int id of the poster (used to start a user actor)

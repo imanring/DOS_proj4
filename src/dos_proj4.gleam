@@ -6,7 +6,7 @@ import gleam/http/response
 import gleam/int
 import gleam/io
 import gleam/list
-
+import gleam/otp/actor
 import gleam/string
 import logging
 import mist
@@ -274,34 +274,23 @@ fn handle_request(
               let subs = parse_subscriptions_csv(subs_csv)
               let k = extract_int_field(body, "k", 3)
 
-              let reply: process.Subject(UserMsg) = process.new_subject()
-              //let assert Ok(result) = actor.call(engine, 10_000, GetFeed(subs, k, reply))
-              process.send(engine, GetFeed(subs, k, reply))
-
-              case process.receive(reply, 5000) {
-                Ok(msg) -> {
-                  case msg {
-                    ReceiveFeed(posts) -> {
-                      let body_json = posts_to_json(posts)
-                      io.println(body_json)
-                      io.println("Requesting Feed")
-                      response.new(200)
-                      |> response.set_header("content-type", "application/json")
-                      |> response.set_body(
-                        mist.Bytes(bytes_tree.from_string(body_json)),
-                      )
-                    }
-                    _ ->
-                      response.new(500)
-                      |> response.set_body(
-                        mist.Bytes(bytes_tree.from_string("Unexpected reply")),
-                      )
-                  }
-                }
-                Error(_) ->
-                  response.new(504)
+              let result =
+                actor.call(engine, 1000, fn(s) { GetFeed(subs, k, s) })
+              case result {
+                ReceiveFeed(posts) -> {
+                  let body_json = posts_to_json(posts)
+                  io.println(body_json)
+                  io.println("Requesting Feed")
+                  response.new(200)
+                  |> response.set_header("content-type", "application/json")
                   |> response.set_body(
-                    mist.Bytes(bytes_tree.from_string("Gateway Timeout")),
+                    mist.Bytes(bytes_tree.from_string(body_json)),
+                  )
+                }
+                _ ->
+                  response.new(500)
+                  |> response.set_body(
+                    mist.Bytes(bytes_tree.from_string("Unexpected reply")),
                   )
               }
             }

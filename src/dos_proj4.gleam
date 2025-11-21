@@ -287,11 +287,12 @@ fn handle_request(
                     mist.Bytes(bytes_tree.from_string(body_json)),
                   )
                 }
-                _ ->
+                _ -> {
                   response.new(500)
                   |> response.set_body(
                     mist.Bytes(bytes_tree.from_string("Unexpected reply")),
                   )
+                }
               }
             }
             Error(_) ->

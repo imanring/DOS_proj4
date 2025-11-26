@@ -92,7 +92,8 @@ fn initialize_subreddits(engine, users, sr_usrs) {
 
 fn register_subreddits(engine, num: Int) {
   case num > 0 {
-    True -> process.send(engine, NewSubReddit)
+    True ->
+      process.send(engine, NewSubReddit("subreddit_" <> int.to_string(num)))
     False -> register_subreddits(engine, num - 1)
   }
 }
@@ -130,7 +131,7 @@ fn run_demo(num_users: Int) {
   let assert Ok(receiver) = list.last(users)
   process.send(user, SendDM(receiver, "Hi there!"))
   process.send(user, Subscribe(0))
-  process.send(engine, NewSubReddit)
+  process.send(engine, NewSubReddit("First Subreddit"))
   process.send(receiver, MakePost(0, -1, "First Post!", receiver))
   process.send(user, MakePost(0, 0, "Nice post.", user))
   process.send(user, RequestFeed(user))

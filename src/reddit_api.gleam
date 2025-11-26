@@ -27,8 +27,8 @@ pub fn create_post(
 }
 
 // Create a new subreddit.
-pub fn create_subreddit(engine: process.Subject(RedditMsg)) {
-  process.send(engine, NewSubReddit)
+pub fn create_subreddit(name: String, engine: process.Subject(RedditMsg)) {
+  process.send(engine, NewSubReddit(name))
 }
 
 // Cast a vote on a post.

@@ -6,7 +6,7 @@ import gleam/otp/actor
 import types.{
   type Post, type RedditEngineState, type RedditMsg, type SubReddit, AddUser,
   CastVote, GetFeed, GetStats, GetUsers, NewPost, NewSubReddit, Post,
-  ReceiveFeed, RedditEngineState, SubReddit, Users,
+  ReceiveFeed, RedditEngineState, Search, SubReddit, Users,
 }
 
 fn update_post_by_id(
@@ -143,14 +143,14 @@ pub fn engine_handler(
         ),
       )
     }
-    NewSubReddit -> {
+    NewSubReddit(name) -> {
       io.println("NewSubReddit: " <> int.to_string(state.max_subreddit_id))
       // Handle new subreddit creation
       actor.continue(RedditEngineState(
         subreddits: [
           SubReddit(
             id: state.max_subreddit_id + 1,
-            name: "subreddit_" <> int.to_string(state.max_subreddit_id + 1),
+            name: name,
             posts: [],
             max_post_id: -1,
           ),
@@ -239,6 +239,15 @@ pub fn engine_handler(
     }
     GetUsers(reply_to) -> {
       process.send(reply_to, Users(state.users))
+      actor.continue(RedditEngineState(..state, total_msg: state.total_msg + 1))
+    }
+    Search(name, k, reply_to) -> {
+      let subreddits =
+        list.map(
+          list.filter(state.subreddits, fn(sr) { name == sr.name }),
+          fn(x) { list.take(x.posts, k) },
+        )
+      process.send(reply_to, ReceiveFeed(subreddits))
       actor.continue(RedditEngineState(..state, total_msg: state.total_msg + 1))
     }
   }

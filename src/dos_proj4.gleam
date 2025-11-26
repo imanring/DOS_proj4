@@ -16,7 +16,7 @@ import reddit_engine
 import reddit_user
 import types.{
   type ApiMsg, type Post, type RedditMsg, type UserMsg, GetFeed, GetUsers,
-  ReceiveFeed, Users,
+  ReceiveFeed, Search, Users,
 }
 
 fn parse_int_or_default(s: String, default: Int) -> Int {
@@ -233,9 +233,30 @@ fn handle_request(
     }
 
     ["create_subreddit"] -> {
-      reddit_api.create_subreddit(engine)
-      response.new(201)
-      |> response.set_body(mist.Bytes(bytes_tree.from_string("Created")))
+      case mist.read_body(req, 1024 * 4) {
+        Ok(r) -> {
+          case bit_array.to_string(r.body) {
+            Ok(body) -> {
+              let name = extract_string_field(body, "name", "")
+              reddit_api.create_subreddit(name, engine)
+              response.new(201)
+              |> response.set_body(
+                mist.Bytes(bytes_tree.from_string("Created")),
+              )
+            }
+            Error(_) ->
+              response.new(400)
+              |> response.set_body(
+                mist.Bytes(bytes_tree.from_string("Bad request")),
+              )
+          }
+        }
+        Error(_) ->
+          response.new(400)
+          |> response.set_body(
+            mist.Bytes(bytes_tree.from_string("Bad request")),
+          )
+      }
     }
 
     ["vote"] -> {
@@ -249,6 +270,49 @@ fn handle_request(
               reddit_api.vote(engine, subreddit, post_id, up)
               response.new(200)
               |> response.set_body(mist.Bytes(bytes_tree.from_string("OK")))
+            }
+            Error(_) ->
+              response.new(400)
+              |> response.set_body(
+                mist.Bytes(bytes_tree.from_string("Bad request")),
+              )
+          }
+        }
+        Error(_) ->
+          response.new(400)
+          |> response.set_body(
+            mist.Bytes(bytes_tree.from_string("Bad request")),
+          )
+      }
+    }
+
+    ["search"] -> {
+      case mist.read_body(req, 1024 * 4) {
+        Ok(r) -> {
+          case bit_array.to_string(r.body) {
+            Ok(body) -> {
+              let name = extract_string_field(body, "name", "")
+              let k = extract_int_field(body, "k", 3)
+              let result =
+                actor.call(engine, 1000, fn(s) { Search(name, k, s) })
+              case result {
+                ReceiveFeed(sr) -> {
+                  let body_json = posts_to_json(sr)
+                  io.println(body_json)
+                  io.println("Searching for subreddit")
+                  response.new(200)
+                  |> response.set_header("content-type", "application/json")
+                  |> response.set_body(
+                    mist.Bytes(bytes_tree.from_string(body_json)),
+                  )
+                }
+                _ -> {
+                  response.new(500)
+                  |> response.set_body(
+                    mist.Bytes(bytes_tree.from_string("Unexpected reply")),
+                  )
+                }
+              }
             }
             Error(_) ->
               response.new(400)

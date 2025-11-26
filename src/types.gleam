@@ -42,13 +42,14 @@ pub type SubReddit {
 
 pub type RedditMsg {
   NewPost(Int, Int, String, process.Subject(UserMsg))
-  NewSubReddit
+  NewSubReddit(name: String)
   CastVote(subreddit_id: Int, post_id: Int, upvote: Bool)
   // True for upvote, False for downvote
   GetFeed(subscriptions: List(Int), k: Int, reply_to: process.Subject(UserMsg))
   GetStats
   AddUser(Int, process.Subject(UserMsg))
   GetUsers(reply_to: process.Subject(ApiMsg))
+  Search(name: String, k: Int, reply_to: process.Subject(UserMsg))
 }
 
 pub type RedditEngineState {

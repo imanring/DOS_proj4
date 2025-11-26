@@ -41,7 +41,7 @@ Create a post:
 ```bash
 curl -X POST http://127.0.0.1:8080/create_post \
   -H "Content-Type: application/json" \
-  -d '{"subreddit":1,"parent":-1,"poster":123,"text":"Hello from curl"}'
+  -d '{"subreddit":1,"parent":-1,"poster":1,"text":"Hello from curl"}'
 ```
 
 Get a synchronous feed:

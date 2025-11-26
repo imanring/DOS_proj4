@@ -1,41 +1,54 @@
-# dos_proj4
+# Reddit Engine HTTP API (Mist)
 
-Reddit API is implemented
+This project contains a simple Mist-based HTTP server (`src/server.gleam`) that
+wires the in-process Reddit engine to HTTP endpoints. The server currently uses
+simple path-segment based arguments to keep the example short.
 
-```
-create_user {"user_id": 0}
-create_user {"user_id": 1}
-create_subreddit
+Endpoints:
 
-create_post {"text": "Hello Reddit!", "subreddit": 0, "poster": 0}
+- Create a post (top-level or reply):
+  POST /create_post/
+  - `subreddit`: Int id of subreddit (-1 for none)
+  - `parent`: Int id of parent post (-1 for top-level)
+  - `poster`: Int id of the poster (used to start a user actor)
+  - `text`: post text (URL-encoded in the path segment)
+  - Example: POST /posts/0/-1/0/Hello%20world
 
-create_post {"text": "Why are you posting this junk here?", "subreddit": 0, "poster": 1, "parent":0}
+- Create a subreddit:
+  POST /create_subreddit/
+  - `name`: name of the subreddit
 
-create_post {"text": "I believe the moon is flat. This is obvious. What do you think?", "subreddit": 0, "poster": 1}
+- Vote on a post:
+  POST /vote/
+  - `post_id`: id of the post to vote on
+  - `subreddit`: id of the subreddit to vote on
+  - `up`: boolean of whether the vote is up or down.
 
-vote {"up": false, "post_id": 2, "subreddit": 0}
+- Request a feed:
+  POST /feed_sync/
+  - `subs_csv`: comma-separated subreddit ids (e.g. "0,1,2")
+  - `k`: number of posts per subreddit
 
-feed_sync {"subs_csv": "0", "k": 5}
+- Search subreddits:
+  POST /search/
+  - `name`: name of the subreddit whose feed you want to look at.
+  - `k`: number of posts per subreddit
 
-create_user {"user_id": 2}
-create_subreddit
+- Create User:
+  POST /create_user/
+  - `user_id`: id of user you want to create
 
-send_dm {"sender_id": 2, "receiver_id": 0, "message": "I created a new positive vibes only subreddit. That way we can avoid user1"}
+- Send Direct Message:
+  POST /send_dm/
+  - `sender_id`: user id of the sender
+  - `receiver_id`: user id of the receiver
+  - `message`: text of the message
 
-create_post {"text": "This is my new subreddit about Distributed Operating Systems", "subreddit": 1, "poster": 2}
+Running
 
+Make sure `mist` and required packages are added to your project. From the
+project root you can start the server with:
 
-create_post {"text": "Only the peer to peer networks count.", "subreddit": 1, "poster": 2}
-
-
-create_post {"text": "Thanks for creating this subreddit. I love distributed operating systems!", "subreddit": 1, "poster": 0, "parent": 0}
-
-vote {"up": true, "subreddit": 1, "post_id": 0}
-
-
-vote {"up": false, "subreddit": 1, "post_id": 0}
-
-create_post {"text": "What a dumb topic why would anyone care about that?", "subreddit": 1, "parent": 2, "poster": 1}
-
-feed_sync {"subs_csv":"0,1","k": 5}
+```sh
+gleam run
 ```
